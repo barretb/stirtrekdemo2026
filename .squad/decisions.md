@@ -109,6 +109,59 @@ public async Task<Dictionary<string, string>?> GetBaggageAsync(
 - Consistent with the existing `LaunchMissionAsync` pattern (which already sets baggage correctly)
 - No changes required to API service — purely a client-side fix
 
+---
+
+### Decision: Observable Gauges for Fuel and Shield Telemetry
+**Status:** Implemented  
+**Author:** Rusty (Backend Dev)  
+**Date:** 2026-04-12
+
+## Problem
+
+The Aspire dashboard displayed the `missions.warpcore.temperature` gauge but not fuel level or shield strength, even though `GetTelemetry()` returned those values in the HTTP response. The telemetry readings were generated but never recorded as OTel metric instruments.
+
+## Root Cause
+
+`MissionService.GetTelemetry()` generated random fuel (0–100) and shield (0–100) values per call and recorded a span with tags, but did NOT record metric instruments. The readings were returned in the API response but never fed into the Meter.
+
+## Solution
+
+Implemented **Observable Gauges in MissionTelemetryService** (matches warp core pattern):
+
+### MissionTelemetryService Changes
+
+1. Added per-mission state dictionaries:
+   - `Dictionary<string, double> _fuelLevels`
+   - `Dictionary<string, double> _shieldStrengths`
+
+2. Added public update methods:
+   ```csharp
+   public void UpdateFuelLevel(string missionId, double value)
+   public void UpdateShieldStrength(string missionId, double value)
+   ```
+
+3. Created `ObservableGauge<double>` instruments:
+   - `missions.fuel.level` (unit: `%`)
+   - `missions.shield.strength` (unit: `%`)
+   - Each emits one measurement per mission with a `mission.id` tag
+
+### MissionService Changes
+
+Modified `GetTelemetry()` to push readings into telemetry service after generating them:
+```csharp
+_telemetry.UpdateFuelLevel(id, reading.FuelLevel);
+_telemetry.UpdateShieldStrength(id, reading.ShieldStrength);
+```
+
+## Impact
+
+- Aspire dashboard now shows live per-mission fuel and shield gauges alongside warp core temperature
+- Observable gauges update whenever telemetry is polled via GET `/api/missions/{id}/telemetry`
+- Consistent pattern with existing warp core temperature gauge
+- Better demo visibility for OTEL metrics showcase
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus

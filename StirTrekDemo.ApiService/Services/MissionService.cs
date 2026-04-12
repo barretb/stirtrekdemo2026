@@ -214,6 +214,10 @@ public class MissionService
             Math.Round(2000 + _random.NextDouble() * 1500, 1),
             DateTimeOffset.UtcNow);
 
+        // Push readings to telemetry service for observable gauges
+        _telemetry.UpdateFuelLevel(id, reading.FuelLevel);
+        _telemetry.UpdateShieldStrength(id, reading.ShieldStrength);
+
         _logger.LogDebug(
             "Telemetry read for {MissionId}: fuel={FuelLevel:F1}% shields={ShieldStrength:F1}%",
             id, reading.FuelLevel, reading.ShieldStrength);

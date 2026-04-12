@@ -22,6 +22,10 @@ public sealed class MissionTelemetryService : IDisposable
     private double _warpCoreTemp = 2500.0;
     private readonly Random _random = Random.Shared;
 
+    // Per-mission state for observable gauges
+    private readonly Dictionary<string, double> _fuelLevels = new();
+    private readonly Dictionary<string, double> _shieldStrengths = new();
+
     public MissionTelemetryService()
     {
         Meter = new Meter(SourceName);
@@ -49,6 +53,19 @@ public sealed class MissionTelemetryService : IDisposable
             GetAverageWarpCoreTemp,
             unit: "celsius",
             description: "Average warp core temperature across active missions");
+
+        // Observable gauges for per-mission fuel and shield
+        Meter.CreateObservableGauge<double>(
+            "missions.fuel.level",
+            () => _fuelLevels.Select(kv => new Measurement<double>(kv.Value, new KeyValuePair<string, object?>("mission.id", kv.Key))),
+            unit: "%",
+            description: "Fuel level percentage per mission");
+
+        Meter.CreateObservableGauge<double>(
+            "missions.shield.strength",
+            () => _shieldStrengths.Select(kv => new Measurement<double>(kv.Value, new KeyValuePair<string, object?>("mission.id", kv.Key))),
+            unit: "%",
+            description: "Shield strength percentage per mission");
     }
 
     private double GetAverageWarpCoreTemp()
@@ -56,6 +73,16 @@ public sealed class MissionTelemetryService : IDisposable
         _warpCoreTemp += (_random.NextDouble() - 0.48) * 50.0;
         _warpCoreTemp = Math.Clamp(_warpCoreTemp, 2000.0, 3500.0);
         return Math.Round(_warpCoreTemp, 1);
+    }
+
+    public void UpdateFuelLevel(string missionId, double value)
+    {
+        _fuelLevels[missionId] = value;
+    }
+
+    public void UpdateShieldStrength(string missionId, double value)
+    {
+        _shieldStrengths[missionId] = value;
     }
 
     public void Dispose()
