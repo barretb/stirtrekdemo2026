@@ -8,4 +8,7 @@
 
 ## Learnings
 
-<!-- Append learnings below -->
+- **Gitignore for .NET Solutions**: Updated .gitignore to properly exclude .NET build artifacts (bin/, obj/), NuGet packages, Visual Studio IDE files (.vs/, *.user, *.csproj.user), test results, Aspire artifacts, and environment-specific configs. This prevents accidental commits of generated/temporary files and keeps the repository clean.
+- **Repository State**: Build artifacts and IDE files were previously being tracked; the updated gitignore now properly handles these. Pre-existing build errors (MvcApplicationParts target) are unrelated to gitignore changes.
+- **Key Paths**: StirTrekDemo solution consists of ApiService, Web (Blazor), ServiceDefaults, and AppHost (orchestrator) projects using .NET 10.
+- **Session 2026-04-12**: Orchestration log created for gitignore update task completion. All decisions merged into decisions.md. Scribe duties completed.

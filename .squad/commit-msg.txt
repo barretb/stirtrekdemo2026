@@ -1,0 +1,9 @@
+Scribe: Merge Rusty .gitignore task completion & consolidate decisions
+
+- Create orchestration log: 2026-04-12T02-08-07-rusty.md
+- Create session log: 2026-04-12T02-08-07-gitignore.md
+- Merge 3 inbox decisions into decisions.md (ADR OTEL stack, gitignore, backend)
+- Delete processed inbox files
+- Update Rusty history with session completion note
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
