@@ -1,0 +1,12 @@
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\bin\Debug\net10.0\StirTrekDemo.ServiceDefaults.deps.json
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\bin\Debug\net10.0\StirTrekDemo.ServiceDefaults.dll
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\bin\Debug\net10.0\StirTrekDemo.ServiceDefaults.pdb
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\StirTrekDemo.ServiceDefaults.csproj.AssemblyReference.cache
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\StirTrekDemo.ServiceDefaults.GeneratedMSBuildEditorConfig.editorconfig
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\StirTrekDemo.ServiceDefaults.AssemblyInfoInputs.cache
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\StirTrekDemo.ServiceDefaults.AssemblyInfo.cs
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\StirTrekDemo.ServiceDefaults.csproj.CoreCompileInputs.cache
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\StirTrekDemo.ServiceDefaults.dll
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\refint\StirTrekDemo.ServiceDefaults.dll
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\StirTrekDemo.ServiceDefaults.pdb
+C:\projects\stirtrekdemo\StirTrekDemo.ServiceDefaults\obj\Debug\net10.0\ref\StirTrekDemo.ServiceDefaults.dll

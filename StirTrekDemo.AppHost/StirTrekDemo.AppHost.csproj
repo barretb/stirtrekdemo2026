@@ -1,0 +1,16 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>8f46a13a-6215-4481-abaf-0debac70cdf9</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StirTrekDemo.ApiService\StirTrekDemo.ApiService.csproj" />
+    <ProjectReference Include="..\StirTrekDemo.Web\StirTrekDemo.Web.csproj" />
+  </ItemGroup>
+
+</Project>
