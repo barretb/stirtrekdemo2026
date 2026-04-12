@@ -1,0 +1,500 @@
+@page "/"
+@rendermode InteractiveServer
+@using StirTrekDemo.Web.Models
+@using StirTrekDemo.Web.Services
+@inject MissionApiClient ApiClient
+@inject FrontendTelemetry Telemetry
+@implements IDisposable
+
+<PageTitle>Mission Control — StirTrek</PageTitle>
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0 fw-bold">🚀 StirTrek Mission Control</h2>
+        <small class="text-secondary">Powered by OpenTelemetry + .NET Aspire</small>
+    </div>
+    <div class="text-end">
+        <span class="badge bg-info text-dark">
+            Open the <strong>Aspire Dashboard</strong> to see these signals in real-time! →
+        </span>
+    </div>
+</div>
+
+<!-- OTEL Signals Banner -->
+<div class="card mb-3 border-secondary">
+    <div class="card-body py-2">
+        <span class="text-secondary fw-semibold me-2">OTEL SIGNALS BEING EMITTED:</span>
+        <span class="badge bg-primary me-1">🔵 Traces</span>
+        <span class="badge bg-success me-1">📊 Metrics</span>
+        <span class="badge bg-warning text-dark me-1">📋 Logs</span>
+        <span class="badge bg-purple me-1" style="background-color:#6f42c1!important">🧳 Baggage</span>
+    </div>
+</div>
+
+<!-- Main Two-Column Layout -->
+<div class="row g-3 mb-3">
+    <!-- Mission Roster -->
+    <div class="col-md-6">
+        <div class="card h-100 border-secondary">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-bold">📋 MISSION ROSTER</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="LoadMissions" disabled="@_loading">
+                    @if (_loading)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                    }
+                    else
+                    {
+                        <span>↺ Refresh</span>
+                    }
+                </button>
+            </div>
+            <div class="card-body p-2">
+                @if (_missionsError is not null)
+                {
+                    <div class="alert alert-warning py-2">
+                        <small>⚠️ API not yet available — backend starting up</small>
+                        <br /><small class="text-muted">@_missionsError</small>
+                    </div>
+                }
+                @if (_missions.Length == 0 && _missionsError is null)
+                {
+                    <div class="text-center py-3 text-secondary">
+                        <span class="spinner-border spinner-border-sm"></span> Loading missions...
+                    </div>
+                }
+                @foreach (var mission in _missions)
+                {
+                    var isSelected = _selectedMission?.Id == mission.Id;
+                    <div class="card mb-2 mission-card @(isSelected ? "border-warning" : "border-secondary")"
+                         style="cursor:pointer; @(isSelected ? "background-color:rgba(255,193,7,0.1)" : "")"
+                         @onclick="() => SelectMission(mission)">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="fw-bold">@mission.Name</span>
+                                    @if (isSelected)
+                                    {
+                                        <span class="ms-2 text-warning">◀ selected</span>
+                                    }
+                                    <div class="text-secondary small">
+                                        🪐 @mission.DestinationPlanet &nbsp;|&nbsp; 👥 @mission.CrewCount crew
+                                    </div>
+                                </div>
+                                <span class="badge @GetStatusBadgeClass(mission.Status)">@mission.Status</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Launch Control -->
+    <div class="col-md-6">
+        <div class="card h-100 border-secondary">
+            <div class="card-header fw-bold">🎯 LAUNCH CONTROL</div>
+            <div class="card-body">
+                @if (_selectedMission is null)
+                {
+                    <div class="alert alert-secondary">👈 Select a mission from the roster to launch</div>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <div class="text-secondary small mb-1">Selected Mission</div>
+                        <span class="badge bg-warning text-dark fs-6">@_selectedMission.Name</span>
+                        <span class="ms-2 text-secondary">→ @_selectedMission.DestinationPlanet</span>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Commander Name <span class="text-warning">(populates W3C Baggage)</span></label>
+                    <input type="text" class="form-control" placeholder="Enter commander name..."
+                           @bind="_commanderName" @bind:event="oninput" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Mission Priority <span class="text-warning">(populates W3C Baggage)</span></label>
+                    <select class="form-select" @bind="_priority">
+                        <option value="High">🔴 High</option>
+                        <option value="Normal" selected>🟡 Normal</option>
+                        <option value="Low">🟢 Low</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-warning btn-lg w-100 fw-bold"
+                        @onclick="LaunchMission"
+                        disabled="@(_selectedMission is null || _launching || string.IsNullOrWhiteSpace(_commanderName))">
+                    @if (_launching)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Launching...</span>
+                    }
+                    else
+                    {
+                        <span>🚀 LAUNCH MISSION</span>
+                    }
+                </button>
+
+                @if (_launchResult is not null)
+                {
+                    <div class="alert @(_launchResult.Success ? "alert-success" : "alert-danger") mt-3 mb-0">
+                        <div class="fw-bold mb-1">@(_launchResult.Success ? "✅ Launch Successful!" : "❌ Launch Failed")</div>
+                        <div>@_launchResult.Message</div>
+                        @if (!string.IsNullOrEmpty(_launchResult.TraceId))
+                        {
+                            <div class="mt-2">
+                                <span class="text-secondary small">TraceId: </span>
+                                <code class="user-select-all" style="font-size:0.8em; word-break:break-all;">@_launchResult.TraceId</code>
+                                <div class="text-secondary" style="font-size:0.75em;">↑ Find this in the Aspire Dashboard → Traces</div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (_launchError is not null)
+                {
+                    <div class="alert alert-danger mt-3 mb-0">
+                        <div class="fw-bold">❌ Error</div>
+                        <small>@_launchError</small>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Three-Column Panel -->
+<div class="row g-3">
+    <!-- Live Telemetry -->
+    <div class="col-md-4">
+        <div class="card border-secondary h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-bold">📡 LIVE TELEMETRY</span>
+                @if (_selectedMission is not null)
+                {
+                    <span class="badge bg-success blinking">● LIVE</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (_selectedMission is null)
+                {
+                    <p class="text-secondary small">Select a mission to see live telemetry</p>
+                }
+                else if (_telemetry is null)
+                {
+                    <div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span></div>
+                }
+                else if (_telemetryError is not null)
+                {
+                    <div class="alert alert-warning py-2"><small>⚠️ @_telemetryError</small></div>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small text-secondary">⛽ Fuel Level</span>
+                            <span class="small fw-bold">@_telemetry.FuelLevel.ToString("F1")%</span>
+                        </div>
+                        <div class="progress" style="height:12px">
+                            <div class="progress-bar @GetFuelBarClass(_telemetry.FuelLevel)"
+                                 style="width:@(_telemetry.FuelLevel)%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small text-secondary">🛡️ Shield Strength</span>
+                            <span class="small fw-bold">@_telemetry.ShieldStrength.ToString("F1")%</span>
+                        </div>
+                        <div class="progress" style="height:12px">
+                            <div class="progress-bar @GetShieldBarClass(_telemetry.ShieldStrength)"
+                                 style="width:@(_telemetry.ShieldStrength)%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span class="small text-secondary">⚛️ Warp Core Temp</span>
+                            <span class="fw-bold @GetTempClass(_telemetry.WarpCoreTemp)">
+                                @_telemetry.WarpCoreTemp.ToString("F0") °C
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-secondary" style="font-size:0.7em;">
+                        Updated: @_telemetry.Timestamp.ToLocalTime().ToString("HH:mm:ss")
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Baggage Inspector -->
+    <div class="col-md-4">
+        <div class="card border-secondary h-100">
+            <div class="card-header fw-bold">🧳 BAGGAGE INSPECTOR</div>
+            <div class="card-body">
+                <p class="text-secondary small">
+                    Key-value pairs that travel <em>automatically</em> from UI → API via HTTP headers — no extra code needed!
+                </p>
+                <button class="btn btn-sm btn-outline-info w-100 mb-3" @onclick="InspectBaggage">
+                    @if (_loadingBaggage)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    🔍 Inspect Baggage
+                </button>
+
+                @if (_baggageError is not null)
+                {
+                    <div class="alert alert-warning py-2"><small>⚠️ @_baggageError</small></div>
+                }
+
+                @if (_baggage is not null)
+                {
+                    @if (_baggage.Count == 0)
+                    {
+                        <p class="text-secondary small">No baggage found — launch a mission first!</p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm table-dark mb-2">
+                            <thead>
+                                <tr>
+                                    <th class="text-warning">Key</th>
+                                    <th class="text-warning">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var kv in _baggage)
+                                {
+                                    <tr>
+                                        <td><code>@kv.Key</code></td>
+                                        <td><code>@kv.Value</code></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <div class="text-secondary" style="font-size:0.7em;">
+                            Propagated via <code>baggage</code> HTTP header automatically by .NET
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="col-md-4">
+        <div class="card border-secondary h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-bold">📜 ACTIVITY LOG</span>
+                @if (_activityLog.Count > 0)
+                {
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => _activityLog.Clear()">Clear</button>
+                }
+            </div>
+            <div class="card-body p-2" style="max-height:300px; overflow-y:auto;">
+                @if (_activityLog.Count == 0)
+                {
+                    <p class="text-secondary small p-2">No activity yet. Launch a mission!</p>
+                }
+                @foreach (var entry in _activityLog.AsEnumerable().Reverse())
+                {
+                    <div class="d-flex gap-2 mb-2 align-items-start log-entry @entry.CssClass">
+                        <span style="font-size:1.1em">@entry.Icon</span>
+                        <div style="font-size:0.8em; min-width:0;">
+                            <div class="text-secondary" style="font-size:0.85em;">@entry.Timestamp.ToString("HH:mm:ss")</div>
+                            <div class="text-truncate">@entry.Message</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .blinking {
+        animation: blink 1.2s step-start infinite;
+    }
+    @@keyframes blink {
+        50% { opacity: 0; }
+    }
+    .log-entry.log-success { color: #6eefa0; }
+    .log-entry.log-error   { color: #f87171; }
+    .log-entry.log-info    { color: #93c5fd; }
+    .log-entry.log-warn    { color: #fcd34d; }
+</style>
+
+@code {
+    private Mission[] _missions = [];
+    private Mission? _selectedMission;
+    private bool _loading;
+    private string? _missionsError;
+
+    private string _commanderName = "";
+    private string _priority = "Normal";
+    private bool _launching;
+    private LaunchResult? _launchResult;
+    private string? _launchError;
+
+    private TelemetryReading? _telemetry;
+    private string? _telemetryError;
+    private Timer? _telemetryTimer;
+
+    private Dictionary<string, string>? _baggage;
+    private bool _loadingBaggage;
+    private string? _baggageError;
+
+    private List<LogEntry> _activityLog = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Telemetry.PageViews.Add(1, new KeyValuePair<string, object?>("page", "mission-control"));
+        await LoadMissions();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _telemetryTimer = new Timer(async _ =>
+            {
+                await RefreshTelemetry();
+                await InvokeAsync(StateHasChanged);
+            }, null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+        }
+    }
+
+    private async Task LoadMissions()
+    {
+        _loading = true;
+        _missionsError = null;
+        try
+        {
+            _missions = await ApiClient.GetMissionsAsync();
+            AddLog("ℹ️", $"Loaded {_missions.Length} missions", "log-info");
+        }
+        catch (Exception ex)
+        {
+            _missionsError = ex.Message;
+            AddLog("⚠️", "Could not load missions — API starting up?", "log-warn");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SelectMission(Mission mission)
+    {
+        _selectedMission = mission;
+        _telemetry = null;
+        _launchResult = null;
+        _launchError = null;
+        AddLog("👆", $"Selected {mission.Name}", "log-info");
+    }
+
+    private async Task LaunchMission()
+    {
+        if (_selectedMission is null) return;
+
+        _launching = true;
+        _launchResult = null;
+        _launchError = null;
+        AddLog("🚀", $"Launching {_selectedMission.Name} (Cmd: {_commanderName}, Priority: {_priority})", "log-info");
+
+        try
+        {
+            var result = await ApiClient.LaunchMissionAsync(
+                _selectedMission.Id, _commanderName, _priority);
+
+            _launchResult = result;
+            if (result is not null)
+            {
+                if (result.Success)
+                    AddLog("✅", $"Success — {_selectedMission.Name} | TraceId: {result.TraceId?[..Math.Min(16, result.TraceId.Length)]}...", "log-success");
+                else
+                    AddLog("❌", $"FAILED — {_selectedMission.Name}: {result.Message}", "log-error");
+
+                // Reload missions to get updated status
+                await LoadMissions();
+            }
+        }
+        catch (Exception ex)
+        {
+            _launchError = ex.Message;
+            AddLog("❌", $"ERROR — {_selectedMission.Name}: {ex.Message}", "log-error");
+        }
+        finally
+        {
+            _launching = false;
+        }
+    }
+
+    private async Task RefreshTelemetry()
+    {
+        if (_selectedMission is null) return;
+        _telemetryError = null;
+        try
+        {
+            _telemetry = await ApiClient.GetTelemetryAsync(_selectedMission.Id);
+        }
+        catch (Exception ex)
+        {
+            _telemetryError = ex.Message;
+        }
+    }
+
+    private async Task InspectBaggage()
+    {
+        _loadingBaggage = true;
+        _baggageError = null;
+        AddLog("🔍", "Inspecting W3C Baggage...", "log-info");
+        try
+        {
+            _baggage = await ApiClient.GetBaggageAsync();
+            AddLog("🧳", $"Baggage: {_baggage?.Count ?? 0} entries found", "log-info");
+        }
+        catch (Exception ex)
+        {
+            _baggageError = ex.Message;
+            AddLog("⚠️", $"Baggage inspect failed: {ex.Message}", "log-warn");
+        }
+        finally
+        {
+            _loadingBaggage = false;
+        }
+    }
+
+    private void AddLog(string icon, string message, string cssClass)
+    {
+        _activityLog.Add(new LogEntry(icon, message, cssClass, DateTimeOffset.Now));
+        if (_activityLog.Count > 10)
+            _activityLog.RemoveAt(0);
+    }
+
+    private static string GetStatusBadgeClass(MissionStatus status) => status switch
+    {
+        MissionStatus.Preparing  => "bg-primary",
+        MissionStatus.Launched   => "bg-warning text-dark",
+        MissionStatus.InTransit  => "bg-success",
+        MissionStatus.Complete   => "bg-secondary",
+        MissionStatus.Aborted    => "bg-danger",
+        _                        => "bg-secondary"
+    };
+
+    private static string GetFuelBarClass(double level) =>
+        level > 50 ? "bg-success" : level > 25 ? "bg-warning" : "bg-danger";
+
+    private static string GetShieldBarClass(double level) =>
+        level > 50 ? "bg-info" : level > 25 ? "bg-warning" : "bg-danger";
+
+    private static string GetTempClass(double temp) =>
+        temp < 8000 ? "text-success" : temp < 12000 ? "text-warning" : "text-danger";
+
+    public void Dispose() => _telemetryTimer?.Dispose();
+
+    private record LogEntry(string Icon, string Message, string CssClass, DateTimeOffset Timestamp);
+}
