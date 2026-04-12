@@ -50,6 +50,23 @@ Built ApiService backend with Star Trek theme:
 
 Endpoints: `/api/missions`, `/api/missions/{id}`, `/api/missions/{id}/launch`, `/api/missions/{id}/telemetry`, `/api/diagnostics/baggage`
 
+---
+
+### Decision: Purge tracked .NET build outputs from index
+**Status:** Completed  
+**Author:** Danny (Lead)  
+**Date:** 2026-04-12
+
+The repository had `bin/` and `obj/` ignore rules, but build outputs remained in Git history because they were tracked before the ignore rules took effect.
+
+**Resolution:**
+- Kept existing `.gitignore` rules for `.NET` build outputs
+- Removed 261 tracked `bin/` and `obj/` paths from the Git index with `git rm --cached`
+- Preserved developers' local build artifacts on disk
+- Verified cleanup with `git ls-files` — no `bin/` or `obj/` entries remain in working tree
+
+**Result:** Repository now has a clean index boundary; developers can build locally without polluting git status. Build artifacts never tracked again.
+
 ## Governance
 
 - All meaningful changes require team consensus

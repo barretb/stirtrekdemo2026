@@ -9,3 +9,4 @@
 ## Learnings
 
 <!-- Append learnings below -->
+- 2026-04-12: For .NET repositories, a correct `.gitignore` is not sufficient once `bin/` and `obj/` content has already been added; the Git index must also be purged with cached removals, and `git ls-files` is the authoritative verification.
