@@ -67,6 +67,48 @@ The repository had `bin/` and `obj/` ignore rules, but build outputs remained in
 
 **Result:** Repository now has a clean index boundary; developers can build locally without polluting git status. Build artifacts never tracked again.
 
+---
+
+### Decision: Fix Baggage Inspection Feature
+**Status:** Implemented  
+**Author:** Rusty (Backend Dev) & Linus (Frontend Dev)  
+**Date:** 2026-04-12
+
+## Problem
+
+The "Inspect Baggage" feature always returned empty results ("No baggage found"), even though baggage propagation worked correctly during mission launches.
+
+## Root Cause
+
+`GetBaggageAsync` in `MissionApiClient.cs` made a bare GET request to `/api/diagnostics/baggage` with no active `Activity`. Without an active Activity, .NET's HttpClient does not inject the `baggage` header into outgoing HTTP requests. The API received the request with no baggage headers, so `Baggage.Current.GetBaggage()` returned an empty dictionary every time.
+
+## Solution
+
+**Backend (Rusty):** Modified `GetBaggageAsync` in `StirTrekDemo.Web\Services\MissionApiClient.cs` to:
+1. Accept `commanderName` and `priority` as parameters (with default empty strings for backward compatibility)
+2. Start an Activity using `telemetry.ActivitySource.StartActivity("baggage.inspect")`
+3. Set baggage on the Activity before making the HTTP call:
+   - `activity?.SetBaggage("mission.commander", commanderName)` (if non-empty)
+   - `activity?.SetBaggage("mission.priority", priority)` (if non-empty)
+4. Make the HTTP call (the active Activity causes .NET to auto-inject the `baggage` header)
+
+New signature:
+```csharp
+public async Task<Dictionary<string, string>?> GetBaggageAsync(
+    string commanderName = "",
+    string priority = "",
+    CancellationToken cancellationToken = default)
+```
+
+**Frontend (Linus):** Updated `InspectBaggage` method in `MissionControl.razor` to pass `_commanderName` and `_priority` to `GetBaggageAsync()`. Form field bindings were already in scope; only needed to be threaded through the API call.
+
+## Impact
+
+- Baggage inspection now works correctly — baggage is propagated via W3C header
+- UI can now demonstrate baggage propagation without launching a mission
+- Consistent with the existing `LaunchMissionAsync` pattern (which already sets baggage correctly)
+- No changes required to API service — purely a client-side fix
+
 ## Governance
 
 - All meaningful changes require team consensus

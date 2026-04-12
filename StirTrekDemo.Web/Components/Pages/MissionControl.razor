@@ -454,7 +454,7 @@
         AddLog("🔍", "Inspecting W3C Baggage...", "log-info");
         try
         {
-            _baggage = await ApiClient.GetBaggageAsync();
+            _baggage = await ApiClient.GetBaggageAsync(_commanderName, _priority);
             AddLog("🧳", $"Baggage: {_baggage?.Count ?? 0} entries found", "log-info");
         }
         catch (Exception ex)

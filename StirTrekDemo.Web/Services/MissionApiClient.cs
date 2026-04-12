@@ -84,8 +84,23 @@ public class MissionApiClient(HttpClient httpClient, FrontendTelemetry telemetry
         }
     }
 
-    public async Task<Dictionary<string, string>?> GetBaggageAsync(CancellationToken cancellationToken = default)
+    public async Task<Dictionary<string, string>?> GetBaggageAsync(
+        string commanderName = "",
+        string priority = "",
+        CancellationToken cancellationToken = default)
     {
+        using var activity = telemetry.ActivitySource.StartActivity("baggage.inspect");
+        
+        if (!string.IsNullOrEmpty(commanderName))
+        {
+            activity?.SetBaggage("mission.commander", commanderName);
+        }
+        
+        if (!string.IsNullOrEmpty(priority))
+        {
+            activity?.SetBaggage("mission.priority", priority);
+        }
+
         var sw = Stopwatch.StartNew();
         try
         {
