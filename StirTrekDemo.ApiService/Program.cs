@@ -1,3 +1,5 @@
+using StirTrekDemo.ApiService.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
@@ -5,9 +7,11 @@ builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
-
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Register Mission Control services as singletons
+builder.Services.AddSingleton<MissionTelemetryService>();
+builder.Services.AddSingleton<MissionService>();
 
 var app = builder.Build();
 
@@ -19,29 +23,45 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+app.MapGet("/", () => "Space Mission Control API is online. See /api/missions to list missions.");
 
-app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.");
+// ── Mission endpoints ────────────────────────────────────────────────────────
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/api/missions", (MissionService missions) =>
+    Results.Ok(missions.GetAllMissions()))
+    .WithName("GetMissions");
+
+app.MapGet("/api/missions/{id}", (string id, MissionService missions) =>
 {
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    var mission = missions.GetMission(id);
+    return mission is not null ? Results.Ok(mission) : Results.NotFound(new { error = $"Mission '{id}' not found." });
 })
-.WithName("GetWeatherForecast");
+.WithName("GetMission");
+
+app.MapPost("/api/missions/{id}/launch", async (string id, MissionService missions) =>
+{
+    var result = await missions.LaunchMissionAsync(id);
+    return result.Success ? Results.Ok(result) : Results.UnprocessableEntity(result);
+})
+.WithName("LaunchMission");
+
+app.MapGet("/api/missions/{id}/telemetry", (string id, MissionService missions) =>
+{
+    if (missions.GetMission(id) is null)
+        return Results.NotFound(new { error = $"Mission '{id}' not found." });
+
+    var reading = missions.GetTelemetry(id);
+    return Results.Ok(reading);
+})
+.WithName("GetMissionTelemetry");
+
+// Diagnostics endpoint — shows W3C Baggage received from the frontend
+app.MapGet("/api/diagnostics/baggage", (MissionService missions) =>
+    Results.Ok(missions.GetCurrentBaggage()))
+    .WithName("GetBaggage");
+
+// ────────────────────────────────────────────────────────────────────────────
 
 app.MapDefaultEndpoints();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

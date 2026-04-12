@@ -1,5 +1,6 @@
 using StirTrekDemo.Web;
 using StirTrekDemo.Web.Components;
+using StirTrekDemo.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,9 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddOutputCache();
 
-builder.Services.AddHttpClient<WeatherApiClient>(client =>
+builder.Services.AddSingleton<FrontendTelemetry>();
+
+builder.Services.AddHttpClient<MissionApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.

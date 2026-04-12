@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 namespace Microsoft.Extensions.Hosting;
@@ -20,6 +22,8 @@ public static class Extensions
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        EnsureW3CPropagation();
+
         builder.ConfigureOpenTelemetry();
 
         builder.AddDefaultHealthChecks();
@@ -44,12 +48,25 @@ public static class Extensions
         return builder;
     }
 
+    /// <summary>
+    /// Ensures W3C TraceContext and Baggage propagation formats are active.
+    /// This is the default in .NET but made explicit here for demo clarity.
+    /// </summary>
+    private static void EnsureW3CPropagation()
+    {
+        Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+        Activity.ForceDefaultIdFormat = true;
+        AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", true);
+    }
+
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Logging.AddOpenTelemetry(logging =>
         {
             logging.IncludeFormattedMessage = true;
             logging.IncludeScopes = true;
+            // Emit structured log attributes and link log records to their trace context
+            logging.ParseStateValues = true;
         });
 
         builder.Services.AddOpenTelemetry()
@@ -57,11 +74,22 @@ public static class Extensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddMeter("StirTrekDemo.ApiService")
+                    .AddMeter("StirTrekDemo.Web")
+                    .ConfigureResource(resource => resource
+                        .AddService(builder.Environment.ApplicationName, serviceVersion: "1.0.0-demo")
+                        .AddAttributes(new Dictionary<string, object>
+                        {
+                            ["deployment.environment"] = builder.Environment.EnvironmentName,
+                            ["demo.conference"] = "StirTrek 2025"
+                        }));
             })
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddSource("StirTrekDemo.ApiService")
+                    .AddSource("StirTrekDemo.Web")
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>
@@ -70,7 +98,14 @@ public static class Extensions
                     )
                     // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                     //.AddGrpcClientInstrumentation()
-                    .AddHttpClientInstrumentation();
+                    .AddHttpClientInstrumentation()
+                    .ConfigureResource(resource => resource
+                        .AddService(builder.Environment.ApplicationName, serviceVersion: "1.0.0-demo")
+                        .AddAttributes(new Dictionary<string, object>
+                        {
+                            ["deployment.environment"] = builder.Environment.EnvironmentName,
+                            ["demo.conference"] = "StirTrek 2025"
+                        }));
             });
 
         builder.AddOpenTelemetryExporters();
