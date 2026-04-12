@@ -1,0 +1,196 @@
+@page "/otel-guide"
+@rendermode InteractiveServer
+@using StirTrekDemo.Web.Services
+@inject FrontendTelemetry Telemetry
+
+<PageTitle>OTEL Guide — StirTrek</PageTitle>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Telemetry.PageViews.Add(1, new KeyValuePair<string, object?>("page", "otel-guide"));
+    }
+}
+
+<div class="mb-4">
+    <h2 class="fw-bold mb-1">📡 OpenTelemetry — The 4 Signals</h2>
+    <p class="text-secondary">
+        Everything this demo emits — right now, live — explained for the audience.
+        Open the <strong class="text-info">Aspire Dashboard</strong> and watch these signals flow in real time!
+    </p>
+</div>
+
+<div class="row g-4">
+    <!-- Traces -->
+    <div class="col-md-6">
+        <div class="card border-primary h-100">
+            <div class="card-header bg-primary text-white fw-bold fs-5">
+                🔵 Traces
+            </div>
+            <div class="card-body">
+                <p>
+                    A <strong>trace</strong> follows a single request as it travels through <em>all</em> your services.
+                    Each step is a <strong>span</strong> — stamped with timing, attributes, and status.
+                </p>
+                <div class="card bg-dark border-secondary mb-3">
+                    <div class="card-body py-2 font-monospace small">
+                        <div class="text-primary">▼ [Browser] mission.launch.initiated</div>
+                        <div class="ms-3 text-success">▼ [API] POST /api/missions/enterprise/launch</div>
+                        <div class="ms-5 text-warning">▼ [DB] INSERT INTO launches</div>
+                        <div class="ms-5 text-secondary">  └─ 4ms</div>
+                        <div class="ms-3 text-secondary">  └─ 12ms</div>
+                        <div class="text-secondary">  └─ 18ms total</div>
+                    </div>
+                </div>
+                <div class="alert alert-primary py-2 mb-0">
+                    <strong>Try it:</strong> Click <em>Launch Mission</em> on the dashboard, then find the
+                    TraceId in <strong>Aspire → Traces</strong>. You'll see the entire journey!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="col-md-6">
+        <div class="card border-success h-100">
+            <div class="card-header bg-success text-white fw-bold fs-5">
+                📊 Metrics
+            </div>
+            <div class="card-body">
+                <p>
+                    Metrics are <strong>numeric measurements</strong> aggregated over time — counters, histograms, and gauges.
+                    They answer "how many?" and "how fast?" questions.
+                </p>
+                <div class="card bg-dark border-secondary mb-3">
+                    <div class="card-body py-2">
+                        <table class="table table-sm table-dark mb-0">
+                            <thead><tr>
+                                <th class="text-success">Metric</th>
+                                <th class="text-success">Type</th>
+                                <th class="text-success">What it measures</th>
+                            </tr></thead>
+                            <tbody class="small">
+                                <tr>
+                                    <td><code>ui.mission.launches</code></td>
+                                    <td>Counter</td>
+                                    <td>Total launches clicked</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ui.page.views</code></td>
+                                    <td>Counter</td>
+                                    <td>Pages navigated</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ui.api.call.duration</code></td>
+                                    <td>Histogram</td>
+                                    <td>API latency in ms</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="alert alert-success py-2 mb-0">
+                    <strong>Try it:</strong> Check <strong>Aspire → Metrics</strong> and watch
+                    <code>ui.mission.launches</code> climb with each launch!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs -->
+    <div class="col-md-6">
+        <div class="card border-warning h-100">
+            <div class="card-header bg-warning text-dark fw-bold fs-5">
+                📋 Logs
+            </div>
+            <div class="card-body">
+                <p>
+                    <strong>Structured logs</strong> with trace context correlation. Unlike plain text logs,
+                    OTEL logs carry <code>TraceId</code> and <code>SpanId</code> — so you can jump straight
+                    from a log line to the full trace!
+                </p>
+                <div class="card bg-dark border-secondary mb-3">
+                    <div class="card-body py-2 font-monospace" style="font-size:0.75em;">
+                        <div class="text-warning">
+                            [INF] Mission Enterprise launch requested<br />
+                            &nbsp;&nbsp;TraceId: <span class="text-info">4bf92f3577b34da6...</span><br />
+                            &nbsp;&nbsp;SpanId: <span class="text-success">00f067aa0ba902b7</span><br />
+                            &nbsp;&nbsp;mission.id: enterprise<br />
+                            &nbsp;&nbsp;commander: @("Kirk")
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-warning py-2 mb-0">
+                    <strong>Try it:</strong> In <strong>Aspire → Logs</strong>, click the TraceId in a
+                    log entry to jump straight to the trace!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Baggage -->
+    <div class="col-md-6">
+        <div class="card h-100" style="border-color:#6f42c1">
+            <div class="card-header text-white fw-bold fs-5" style="background-color:#6f42c1">
+                🧳 Baggage
+            </div>
+            <div class="card-body">
+                <p>
+                    <strong>Baggage</strong> is a set of key-value pairs that travel with the request context
+                    automatically across service boundaries — like metadata that hitches a ride on every HTTP call.
+                </p>
+                <div class="card bg-dark border-secondary mb-3">
+                    <div class="card-body py-2">
+                        <div class="small text-secondary mb-1">HTTP Header sent automatically:</div>
+                        <code class="text-warning" style="word-break:break-all; font-size:0.8em;">
+                            baggage: mission.commander=Kirk, mission.priority=High
+                        </code>
+                        <div class="mt-2 small text-secondary">
+                            ↑ You set this in the UI. The API reads it without a request body field!
+                        </div>
+                    </div>
+                </div>
+                <div class="alert py-2 mb-0" style="background-color:rgba(111,66,193,0.2); border-color:#6f42c1; color:#d0b4f7">
+                    <strong>Try it:</strong> Launch a mission with a commander name. Then hit
+                    <strong>🔍 Inspect Baggage</strong> on the dashboard to see it propagated!
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- How It All Connects -->
+<div class="card border-secondary mt-4">
+    <div class="card-header fw-bold">🔗 How It All Connects</div>
+    <div class="card-body">
+        <div class="row align-items-center text-center g-3">
+            <div class="col">
+                <div class="card bg-dark border-primary p-2">
+                    <div class="text-primary fw-bold">Blazor UI</div>
+                    <div class="small text-secondary">Starts trace, sets baggage,<br/>records metrics</div>
+                </div>
+            </div>
+            <div class="col-auto text-secondary fs-4">→</div>
+            <div class="col">
+                <div class="card bg-dark border-success p-2">
+                    <div class="text-success fw-bold">HTTP Request</div>
+                    <div class="small text-secondary">W3C <code>traceparent</code> + <code>baggage</code><br/>headers auto-injected</div>
+                </div>
+            </div>
+            <div class="col-auto text-secondary fs-4">→</div>
+            <div class="col">
+                <div class="card bg-dark border-warning p-2">
+                    <div class="text-warning fw-bold">.NET API</div>
+                    <div class="small text-secondary">Continues trace, reads baggage,<br/>emits logs + metrics</div>
+                </div>
+            </div>
+            <div class="col-auto text-secondary fs-4">→</div>
+            <div class="col">
+                <div class="card bg-dark border-info p-2">
+                    <div class="text-info fw-bold">Aspire Dashboard</div>
+                    <div class="small text-secondary">OTLP collector receives<br/>all 4 signals live</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

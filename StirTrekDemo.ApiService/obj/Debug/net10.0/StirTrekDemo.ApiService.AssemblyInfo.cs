@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("StirTrekDemo.ApiService")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+76cd2b29b471fc89aca2fd172ebd5d43234562da")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f41c2bd6a3d944392e23a602c4c05bab6fd306f2")]
 [assembly: System.Reflection.AssemblyProductAttribute("StirTrekDemo.ApiService")]
 [assembly: System.Reflection.AssemblyTitleAttribute("StirTrekDemo.ApiService")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
