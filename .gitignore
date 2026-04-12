@@ -5,3 +5,65 @@
 .squad/sessions/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
+
+# .NET / Visual Studio
+## Build artifacts
+bin/
+obj/
+out/
+*.dll
+*.exe
+*.pdb
+*.so
+*.dylib
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!packages/build/
+
+## Visual Studio cache/options
+.vs/
+.vscode/
+
+## User-specific files
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+
+## Test Results
+TestResults/
+*.trx
+coverage/
+*.coverage
+
+## Aspire and .NET
+.aspnet/
+.app/
+launchSettings.json
+appsettings.*.json
+
+## Build and configuration
+*.csproj.user
+*.csproj.VisualStudio.user
+*.csproj.vspscc
+*.vspscc
+
+## Local Environment
+.env
+.env.local
+appsettings.Development.json
+
+## IDE-specific files
+*.sln.iml
+.DS_Store
+Thumbs.db
+
+## BinLog files
+*.binlog
+
+## VisualStudio Compact Database
+*.cd
