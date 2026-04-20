@@ -162,6 +162,163 @@ _telemetry.UpdateShieldStrength(id, reading.ShieldStrength);
 
 ---
 
+### Decision: Demo Features — Reset Missions and Force Failure
+
+**Status:** Implemented  
+**Author:** Rusty (Backend Dev)  
+**Date:** 2025-01-13
+
+## Context
+
+For presentation demos, needed two utility features in the API service:
+1. A way to reset all missions back to their initial state
+2. A way to force mission launch failures on demand
+
+## Implementation
+
+### 1. Reset Missions Endpoint
+
+Added `POST /api/missions/reset` endpoint that resets the demo environment:
+
+**MissionService.cs:**
+- New public method `ResetMissions()` that:
+  - Resets all 5 missions (Enterprise, Voyager, DS9, Discovery, Defiant) to `MissionStatus.Preparing`
+  - Restores original launch dates relative to current time:
+    - Enterprise: +7 days
+    - Voyager: +14 days
+    - DS9: +3 days
+    - Discovery: +21 days
+    - Defiant: +1 day
+  - Clears `_guaranteedFailureFired` HashSet so Defiant will fail on next launch (preserves demo behavior)
+  - Returns int count of missions reset
+  - Logs: `"Missions reset: {Count} missions returned to Preparing"`
+
+**Program.cs:**
+- Registered endpoint: `POST /api/missions/reset`
+- Returns: `{ reset: count, message: "All missions reset to Preparing." }`
+- Endpoint name: `"ResetMissions"`
+
+### 2. Force Failure Query Parameter
+
+Updated launch endpoint to support forced failures for demo scenarios:
+
+**MissionService.cs:**
+- Changed signature: `LaunchMissionAsync(string id)` → `LaunchMissionAsync(string id, bool forceFailure = false)`
+- When `forceFailure = true`, sets `shouldFail = true` immediately (bypasses both random 10% logic and Defiant first-launch logic)
+- Preserves existing failure phase selection and OTEL instrumentation
+
+**Program.cs:**
+- Updated `POST /api/missions/{id}/launch` to accept `forceFailure` bool query parameter (defaults to false)
+- Example usage: `POST /api/missions/enterprise/launch?forceFailure=true`
+
+## Design Decisions
+
+- **Reset is stateless**: Doesn't track previous state, just resets to hardcoded initial values
+- **Reset clears failure tracker**: Ensures Defiant demo behavior works across multiple demo runs
+- **Force failure is opt-in**: Default behavior unchanged; requires explicit query param
+- **No OTEL on reset**: Reset is a utility endpoint for demo control, not a business operation
+- **Existing OTEL preserved**: Launch instrumentation unchanged; force failure traces identical to natural failures
+
+## Impact
+
+- Presenters can reset demo environment between presentations without restarting the app
+- Presenters can demonstrate failure scenarios on-demand without relying on 10% random chance or Defiant first-launch trigger
+- All existing mission launch behavior preserved when `forceFailure` is not specified
+- Clean separation between business logic and demo utilities
+
+---
+
+### Decision: Presentation-Friendly UI Features
+
+**Status:** Implemented  
+**Author:** Linus (Frontend Dev)  
+**Date:** 2025-01-13
+
+## Problem
+
+Mission Control needed four presentation-friendly features to make OTEL demos more engaging and easier to demonstrate:
+1. Ability to reset all missions back to Preparing state
+2. Force failure toggle for predictable demo scenarios  
+3. Load generator to quickly create multiple traces/metrics
+4. Easy TraceId copying to transition to Aspire Dashboard
+
+## Solution
+
+### Feature 1: Reset All Missions
+
+**Backend (`MissionApiClient.cs`):**
+- Added `ResetMissionsAsync()` method that calls `POST /api/missions/reset`
+- Returns `(int Reset, string Message)` tuple
+- Maintains OTEL instrumentation pattern with ApiCallDuration metric
+
+**Frontend (`MissionControl.razor`):**
+- Added "🔄 Reset All" button (btn-outline-danger) in MISSION ROSTER header
+- Clears selected mission and launch results on reset
+- Logs reset count to activity log
+- Disabled while loading
+
+### Feature 2: Force Failure Toggle
+
+**Backend (`MissionApiClient.cs`):**
+- Updated `LaunchMissionAsync` signature to accept `bool forceFailure = false`
+- Appends `?forceFailure=true` query parameter when enabled
+- **Bug fix:** Removed `EnsureSuccessStatusCode()` that was discarding 422 responses — now reads LaunchResult regardless of HTTP status code
+
+**Frontend (`MissionControl.razor`):**
+- Added `_forceFailure` bool field
+- Added checkbox below priority dropdown with "☠️ Force Failure" label and demo hint
+- Passes `_forceFailure` to LaunchMissionAsync call
+
+### Feature 3: Load Generator
+
+**Frontend (`MissionControl.razor`):**
+- Added `_generating` bool and `_generateProgress` string fields
+- Created `GenerateLoad()` method:
+  - Finds all missions with `Status == MissionStatus.Preparing`
+  - Launches each with commander "Load Generator", priority "High", no forced failure
+  - 600ms delay between launches (spreads traces in Aspire timeline)
+  - Updates `_generateProgress` with "N/M" counter
+  - Logs each result to activity log
+  - Reloads missions after completion
+- Added "⚡ Generate Load" button (btn-outline-success) in MISSION ROSTER header
+- Disabled when no Preparing missions exist or already generating
+- Shows spinner + progress counter while running
+
+### Feature 4: Copy TraceId to Clipboard
+
+**Frontend (`MissionControl.razor`):**
+- Injected `IJSRuntime` service
+- Added `CopyToClipboard(string text)` async method using JS interop:
+  - Calls `navigator.clipboard.writeText` via JS
+  - Silently catches errors (clipboard API may not be available in all contexts)
+- Added "📋 Copy" button next to TraceId display in launch result card
+- TraceId remains full length (not truncated) in the card
+- Note: Activity log still shows truncated TraceId (kept for compact display)
+
+## UI Placement
+
+- **Reset All** and **Load Generator** buttons: Added to MISSION ROSTER card header in a `btn-group` with existing Refresh button
+- **Force Failure** checkbox: Placed below priority dropdown in Launch Control panel
+- **Copy TraceId** button: Inline with TraceId display in launch result alert
+
+## Impact
+
+- Presenters can quickly reset demo state between scenarios
+- Force failure enables predictable "failure trace" demonstrations
+- Load generator creates multiple traces with one click for metrics visualization
+- TraceId copy reduces friction when transitioning to Aspire Dashboard exploration
+- Maintains all existing OTEL instrumentation (no regression)
+- Star Trek aesthetic preserved
+
+## Technical Notes
+
+- All four features coordinate with Rusty's backend changes (reset and force-failure endpoints)
+- Fixed existing bug where 422 status code from failed launches was throwing before reading response body
+- All OTEL instrumentation preserved (Activity, Baggage, Metrics)
+- Force failure parameter defaults to false for backward compatibility
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
