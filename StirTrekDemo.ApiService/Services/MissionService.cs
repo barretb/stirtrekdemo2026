@@ -39,7 +39,7 @@ public class MissionService
     public Mission? GetMission(string id) =>
         _missions.TryGetValue(id, out var m) ? m : null;
 
-    public async Task<LaunchResult> LaunchMissionAsync(string id)
+    public async Task<LaunchResult> LaunchMissionAsync(string id, bool forceFailure = false)
     {
         if (!_missions.TryGetValue(id, out var mission))
             return new LaunchResult(false, $"Mission '{id}' not found.", null, "", "");
@@ -77,9 +77,13 @@ public class MissionService
             "Launch authorized by commander {Commander} with priority {Priority}",
             commander, priority);
 
-        // Determine failure up-front: Defiant always fails its first attempt for demo effect
+        // Determine failure up-front: forceFailure param overrides all other logic
         bool shouldFail;
-        if (id.Equals("defiant", StringComparison.OrdinalIgnoreCase)
+        if (forceFailure)
+        {
+            shouldFail = true;
+        }
+        else if (id.Equals("defiant", StringComparison.OrdinalIgnoreCase)
             && !_guaranteedFailureFired.Contains(id))
         {
             shouldFail = true;
@@ -227,4 +231,57 @@ public class MissionService
 
     public IReadOnlyDictionary<string, string> GetCurrentBaggage() =>
         Baggage.Current.GetBaggage();
+
+    public int ResetMissions()
+    {
+        int count = 0;
+        var now = DateTimeOffset.UtcNow;
+
+        // Reset Enterprise
+        if (_missions.ContainsKey("enterprise"))
+        {
+            _missions["enterprise"] = new Mission("enterprise", "Enterprise NCC-1701", "Alpha Centauri", 430,
+                MissionStatus.Preparing, now.AddDays(7));
+            count++;
+        }
+
+        // Reset Voyager
+        if (_missions.ContainsKey("voyager"))
+        {
+            _missions["voyager"] = new Mission("voyager", "Voyager NCC-74656", "Delta Quadrant", 141,
+                MissionStatus.Preparing, now.AddDays(14));
+            count++;
+        }
+
+        // Reset DS9
+        if (_missions.ContainsKey("ds9"))
+        {
+            _missions["ds9"] = new Mission("ds9", "Deep Space Nine", "Bajoran Wormhole", 2500,
+                MissionStatus.Preparing, now.AddDays(3));
+            count++;
+        }
+
+        // Reset Discovery
+        if (_missions.ContainsKey("discovery"))
+        {
+            _missions["discovery"] = new Mission("discovery", "Discovery NCC-1031", "Terran Empire", 136,
+                MissionStatus.Preparing, now.AddDays(21));
+            count++;
+        }
+
+        // Reset Defiant
+        if (_missions.ContainsKey("defiant"))
+        {
+            _missions["defiant"] = new Mission("defiant", "Defiant NX-74205", "Gamma Quadrant", 50,
+                MissionStatus.Preparing, now.AddDays(1));
+            count++;
+        }
+
+        // Clear the guaranteed failure tracker so Defiant will fail again on next launch
+        _guaranteedFailureFired.Clear();
+
+        _logger.LogInformation("Missions reset: {Count} missions returned to Preparing", count);
+
+        return count;
+    }
 }

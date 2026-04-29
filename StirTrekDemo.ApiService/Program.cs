@@ -38,9 +38,9 @@ app.MapGet("/api/missions/{id}", (string id, MissionService missions) =>
 })
 .WithName("GetMission");
 
-app.MapPost("/api/missions/{id}/launch", async (string id, MissionService missions) =>
+app.MapPost("/api/missions/{id}/launch", async (string id, MissionService missions, bool forceFailure = false) =>
 {
-    var result = await missions.LaunchMissionAsync(id);
+    var result = await missions.LaunchMissionAsync(id, forceFailure);
     return result.Success ? Results.Ok(result) : Results.UnprocessableEntity(result);
 })
 .WithName("LaunchMission");
@@ -54,6 +54,13 @@ app.MapGet("/api/missions/{id}/telemetry", (string id, MissionService missions) 
     return Results.Ok(reading);
 })
 .WithName("GetMissionTelemetry");
+
+app.MapPost("/api/missions/reset", (MissionService missions) =>
+{
+    var count = missions.ResetMissions();
+    return Results.Ok(new { reset = count, message = "All missions reset to Preparing." });
+})
+.WithName("ResetMissions");
 
 // Diagnostics endpoint — shows W3C Baggage received from the frontend
 app.MapGet("/api/diagnostics/baggage", (MissionService missions) =>

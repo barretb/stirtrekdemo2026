@@ -4,6 +4,7 @@
 @using StirTrekDemo.Web.Services
 @inject MissionApiClient ApiClient
 @inject FrontendTelemetry Telemetry
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Mission Control — StirTrek</PageTitle>
@@ -39,16 +40,34 @@
         <div class="card h-100 border-secondary">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span class="fw-bold">📋 MISSION ROSTER</span>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="LoadMissions" disabled="@_loading">
-                    @if (_loading)
-                    {
-                        <span class="spinner-border spinner-border-sm" role="status"></span>
-                    }
-                    else
-                    {
-                        <span>↺ Refresh</span>
-                    }
-                </button>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="LoadMissions" disabled="@_loading">
+                        @if (_loading)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                        }
+                        else
+                        {
+                            <span>↺ Refresh</span>
+                        }
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="ResetMissions" disabled="@_loading" title="Reset all missions to Preparing">
+                        🔄 Reset All
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" @onclick="GenerateLoad" 
+                            disabled="@(_loading || _generating || !_missions.Any(m => m.Status == MissionStatus.Preparing))"
+                            title="Launch all Preparing missions to generate metrics & traces">
+                        @if (_generating)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>@_generateProgress</span>
+                        }
+                        else
+                        {
+                            <span>⚡ Generate Load</span>
+                        }
+                    </button>
+                </div>
             </div>
             <div class="card-body p-2">
                 @if (_missionsError is not null)
@@ -124,6 +143,13 @@
                     </select>
                 </div>
 
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="forceFailure" @bind="_forceFailure" />
+                    <label class="form-check-label text-secondary small" for="forceFailure">
+                        ☠️ Force Failure <span class="text-warning">(demo: guaranteed abort)</span>
+                    </label>
+                </div>
+
                 <button class="btn btn-warning btn-lg w-100 fw-bold"
                         @onclick="LaunchMission"
                         disabled="@(_selectedMission is null || _launching || string.IsNullOrWhiteSpace(_commanderName))">
@@ -148,6 +174,9 @@
                             <div class="mt-2">
                                 <span class="text-secondary small">TraceId: </span>
                                 <code class="user-select-all" style="font-size:0.8em; word-break:break-all;">@_launchResult.TraceId</code>
+                                <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => CopyToClipboard(_launchResult.TraceId)" title="Copy TraceId">
+                                    📋 Copy
+                                </button>
                                 <div class="text-secondary" style="font-size:0.75em;">↑ Find this in the Aspire Dashboard → Traces</div>
                             </div>
                         }
@@ -335,9 +364,13 @@
 
     private string _commanderName = "";
     private string _priority = "Normal";
+    private bool _forceFailure;
     private bool _launching;
     private LaunchResult? _launchResult;
     private string? _launchError;
+
+    private bool _generating;
+    private string _generateProgress = "";
 
     private TelemetryReading? _telemetry;
     private string? _telemetryError;
@@ -408,7 +441,7 @@
         try
         {
             var result = await ApiClient.LaunchMissionAsync(
-                _selectedMission.Id, _commanderName, _priority);
+                _selectedMission.Id, _commanderName, _priority, _forceFailure);
 
             _launchResult = result;
             if (result is not null)
@@ -430,6 +463,85 @@
         finally
         {
             _launching = false;
+        }
+    }
+
+    private async Task ResetMissions()
+    {
+        _loading = true;
+        try
+        {
+            var result = await ApiClient.ResetMissionsAsync();
+            _selectedMission = null;
+            _launchResult = null;
+            _launchError = null;
+            AddLog("🔄", $"Reset — {result.Reset} missions back to Preparing", "log-info");
+            await LoadMissions();
+        }
+        catch (Exception ex)
+        {
+            AddLog("⚠️", $"Reset failed: {ex.Message}", "log-warn");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task GenerateLoad()
+    {
+        _generating = true;
+        _generateProgress = "";
+        
+        try
+        {
+            var preparingMissions = _missions.Where(m => m.Status == MissionStatus.Preparing).ToArray();
+            
+            for (int i = 0; i < preparingMissions.Length; i++)
+            {
+                var mission = preparingMissions[i];
+                _generateProgress = $"{i + 1}/{preparingMissions.Length}";
+                await InvokeAsync(StateHasChanged);
+                
+                try
+                {
+                    var result = await ApiClient.LaunchMissionAsync(
+                        mission.Id, "Load Generator", "High", forceFailure: false);
+                    
+                    if (result is not null)
+                    {
+                        if (result.Success)
+                            AddLog("⚡", $"Generated — {mission.Name} launched successfully", "log-success");
+                        else
+                            AddLog("⚡", $"Generated — {mission.Name} failed: {result.Message}", "log-warn");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AddLog("⚠️", $"Load gen failed for {mission.Name}: {ex.Message}", "log-warn");
+                }
+                
+                await Task.Delay(600);
+            }
+            
+            await LoadMissions();
+            _generateProgress = "";
+        }
+        finally
+        {
+            _generating = false;
+        }
+    }
+
+    private async Task CopyToClipboard(string text)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+        }
+        catch
+        {
+            // Silently ignore — clipboard may not be available
         }
     }
 

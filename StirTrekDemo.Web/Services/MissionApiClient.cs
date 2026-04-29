@@ -40,6 +40,7 @@ public class MissionApiClient(HttpClient httpClient, FrontendTelemetry telemetry
         string id,
         string commanderName,
         string priority,
+        bool forceFailure = false,
         CancellationToken cancellationToken = default)
     {
         using var activity = telemetry.ActivitySource.StartActivity("mission.launch.initiated");
@@ -58,8 +59,8 @@ public class MissionApiClient(HttpClient httpClient, FrontendTelemetry telemetry
         var sw = Stopwatch.StartNew();
         try
         {
-            var response = await httpClient.PostAsync($"/api/missions/{id}/launch", null, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            var response = await httpClient.PostAsync($"/api/missions/{id}/launch{(forceFailure ? "?forceFailure=true" : "")}", null, cancellationToken);
+            // Read body regardless of status code (422 = launch failed, still has LaunchResult)
             return await response.Content.ReadFromJsonAsync<LaunchResult>(cancellationToken);
         }
         finally
@@ -113,4 +114,23 @@ public class MissionApiClient(HttpClient httpClient, FrontendTelemetry telemetry
                 new KeyValuePair<string, object?>("endpoint", "GET /api/diagnostics/baggage"));
         }
     }
+
+    public async Task<(int Reset, string Message)> ResetMissionsAsync(CancellationToken cancellationToken = default)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var response = await httpClient.PostAsync("/api/missions/reset", null, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<ResetResult>(cancellationToken);
+            return (result?.Reset ?? 0, result?.Message ?? "Reset complete");
+        }
+        finally
+        {
+            telemetry.ApiCallDuration.Record(sw.Elapsed.TotalMilliseconds,
+                new KeyValuePair<string, object?>("endpoint", "POST /api/missions/reset"));
+        }
+    }
+
+    private record ResetResult(int Reset, string Message);
 }
